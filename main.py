@@ -26,3 +26,36 @@ print(df)
 print(df.describe())
 
 print(df.nunique())
+
+print(df.sort_values(by = 'Per Capita', ascending = False).head(10))
+
+#correlation analysis and heatmap
+print(df.corr(numeric_only=True))
+
+sns.heatmap(df.corr(numeric_only=True), annot = True)
+
+plt.show()
+
+#pattern identification
+
+sns.lineplot(data = df, x = 'Year', y = 'Total', hue = 'Country')
+
+plt.show()
+
+df2 =df.groupby('Country')[['Cement','Gas','Oil','Coal','Total']].mean(numeric_only=True).sort_values(by = 'Total', ascending = False)
+
+df3 = df2.transpose()
+
+df3.plot()
+
+plt.show()
+
+df.boxplot()
+
+plt.show()
+
+df4 = df.set_index('Country')
+
+df4.plot()
+
+plt.show()
