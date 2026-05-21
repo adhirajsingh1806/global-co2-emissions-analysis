@@ -72,14 +72,17 @@ plt.show()
 df2 = df.groupby('Country')[['Cement', 'Gas', 'Oil', 'Coal', 'Total']].mean(numeric_only=True).sort_values(by='Total', ascending=False)
 
 df4 = df.set_index('Country')
-df4[['Coal', 'Oil', 'Gas', 'Cement', 'Total']].plot()
+df4[['Coal', 'Oil', 'Gas', 'Cement']].plot()
 plt.title('Emissions by Country')
 plt.tight_layout()
 plt.show()
 
-df.boxplot(column=fuel_cols)
-plt.title('Distribution and Outliers by Source')
-plt.xticks(rotation=45)
+fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+for ax, col in zip(axes.flatten(), fuel_cols):
+    df.boxplot(column=col, ax=ax)
+    ax.set_title(col)
+    ax.set_ylabel('tCO2 per person' if col == 'Per Capita' else 'MtCO2')
+fig.suptitle('Distribution and Outliers by Source')
 plt.tight_layout()
 plt.show()
 
