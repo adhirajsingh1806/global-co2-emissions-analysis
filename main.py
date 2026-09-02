@@ -566,8 +566,5 @@ for name, row in results_df.iterrows():
     marker = " ★" if row['Test MAE'] == best_mae else ""
     print(f"{name:<30} {row['Test MAE']:>14,.2f}     {row['Test R²']:>8.4f}  {diff:>+8.1f}%{marker}")
 
-<<<<<<< HEAD
 print(f"\nBest Model: {results_df.index[0]} : Test MAE = {best_mae:,.2f} MtCO2")
-=======
-print(f"\nBest Model: {results_df.index[0]} : Test MAE = {best_mae:,.2f} MtCO2")
->>>>>>> 3a10398c7d0bc1cbe5330b0cfe43bc532a6e35c1
+
