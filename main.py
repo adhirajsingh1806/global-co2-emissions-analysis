@@ -68,6 +68,12 @@ print("\nDescriptive Statistics")
 print(df.describe())
 print("\nUnique values:\n", df.nunique())
 print("\nTop 10 by Per Capita:\n", df.sort_values(by='Per Capita', ascending=False).head(10))
+
+latest_year = df['Year'].max()
+recent_years = df['Year'] >= (latest_year - 4)
+recent_avg = df[recent_years].groupby('Country')['Per Capita'].mean().sort_values(ascending=False)
+print(f"\nTop 10 by Per Capita (avg of {latest_year-4}-{latest_year}):\n", recent_avg.head(10))
+
 print("\nCorrelation matrix:\n", df.corr(numeric_only=True))
 
 #data visualisation
