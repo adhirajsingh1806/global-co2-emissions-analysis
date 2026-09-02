@@ -13,9 +13,30 @@ plt.style.use('ggplot')
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.float_format', lambda x: '%.2f' % x)
 
-top_countries = ["Russia", "Mexico", "China", "USA", "Brazil", "Bangladesh", "India", "Nigeria", "Pakistan", "Indonesia"]
-start_year = 2000
-split_year = 2017
+top_countries = [   
+    "China",
+    "USA",
+    "India",
+    "Russia",
+    "Japan",
+    "Brazil",
+    "Canada",
+    "South Korea",
+    "Germany",
+    "France",
+    "Saudi Arabia",
+    "Indonesia",
+    "Iran",
+    "Mexico",
+    "Turkey",
+    "Viet Nam",
+    "Italy",
+    "Taiwan",
+    "United Kingdom",
+    "Australia",
+    ]
+start_year = 1950
+split_year = 1990
 forecast_end = 2030
 
 #data cleaning and preparation
@@ -25,13 +46,10 @@ df = pd.read_csv(r"https://drive.google.com/uc?export=download&id=1gbTwzt4Vkzrsc
 df = df.drop_duplicates()
 df = df.query('Year >= @start_year')
 df = df.query('Country in @top_countries')
-df = df.drop(columns=['Flaring', 'Other'])
-df = df.fillna('')
-df = df.dropna(subset=['Total', 'Coal', 'Oil', 'Gas', 'Cement'])
+df = df.dropna(subset=['Total', 'Coal', 'Oil', 'Gas', 'Cement'])   # drop NaNs first
 df = df.reset_index(drop=True)
 
 print("Dataset shape:", df.shape)
-print(df.head())
 print("\nNull values:\n", df.isnull().sum())
 
 # Outlier detection using the IQR method
@@ -263,6 +281,43 @@ model_results['ARIMA (agg)'] = {
     'test_mae': arima_agg_test_mae, 'test_r2': arima_agg_test_r2
 }
 
+print("MODEL 3b: ARIMAX (Aggregate, with COVID dummy)")
+train_exog = train[['Year']].assign(covid_dummy=(train['Year'] == 2020).astype(int))[['covid_dummy']]
+test_exog = test[['Year']].assign(covid_dummy=(test['Year'] == 2020).astype(int))[['covid_dummy']]
+
+best_aic = np.inf
+best_order_agg_x = (1, 1, 0)
+for p in range(0, 4):
+    for d in range(0, 3):
+        for q in range(0, 4):
+            try:
+                model = ARIMA(train_world_vals, order=(p, d, q), exog=train_exog)
+                fit = model.fit()
+                if fit.aic < best_aic:
+                    best_aic = fit.aic
+                    best_order_agg_x = (p, d, q)
+            except:
+                continue
+
+model_agg_arimax = ARIMA(train_world_vals, order=best_order_agg_x, exog=train_exog)
+fit_agg_arimax = model_agg_arimax.fit()
+
+arimax_test_pred = fit_agg_arimax.forecast(steps=len(test_years), exog=test_exog)
+arimax_test_mae = mean_absolute_error(actual_test, arimax_test_pred)
+arimax_test_r2 = r2_score(actual_test, arimax_test_pred)
+arimax_train_pred = fit_agg_arimax.fittedvalues
+arimax_train_mae = mean_absolute_error(train_world_vals, arimax_train_pred)
+arimax_train_r2 = r2_score(train_world_vals, arimax_train_pred)
+
+print(f"Best ARIMAX order: {best_order_agg_x}")
+print(f"Train : R²: {arimax_train_r2:.4f}, MAE: {arimax_train_mae:.2f} MtCO2")
+print(f"Test  : R²: {arimax_test_r2:.4f}, MAE: {arimax_test_mae:.2f} MtCO2")
+
+model_results['ARIMAX (agg, COVID dummy)'] = {
+    'train_mae': arimax_train_mae, 'train_r2': arimax_train_r2,
+    'test_mae': arimax_test_mae, 'test_r2': arimax_test_r2
+}
+
 #future forecast
 model_full_arima = ARIMA(world['Total'].values, order=best_order_agg)
 fit_full_arima = model_full_arima.fit()
@@ -350,6 +405,7 @@ print("MODEL 5: ARIMA (Country-Level)")
 arima_country_preds_test = {}
 arima_country_preds_future = {}
 arima_best_orders = {}
+arima_country_r2 = {}
 
 for country in top_countries:
     cdf = df[df['Country'] == country][['Year', 'Total']].copy().sort_values('Year')
@@ -357,6 +413,8 @@ for country in top_countries:
     test_c = cdf[cdf['Year'] > split_year]['Total'].values
     full_c = cdf['Total'].values
     n_test = len(test_c)
+
+    diagnostic_countries = ['China', 'Russia']
 
     #grid search for best ARIMA order
     best_aic = np.inf
@@ -386,18 +444,46 @@ for country in top_countries:
     model_full = ARIMA(full_c, order=best_order)
     fit_full = model_full.fit()
     fc_future = fit_full.forecast(steps=n_future)
-    #combine historical + future for plotting
-    arima_country_preds_future[country] = np.concatenate([full_c, fc_future])
+    years_c = np.concatenate([cdf['Year'].values, np.arange(cdf['Year'].max() + 1, forecast_end + 1)])
+    arima_country_preds_future[country] = pd.Series(
+        np.concatenate([full_c, fc_future]), index=years_c
+    )
+
+    if country in diagnostic_countries:
+        print(f"\n Diagnostic: {country}")
+        for yr, act, pred in zip(test_years, test_c, fc_test):
+            err = abs(act-pred)
+            pct = err/act * 100
+            print(f"{yr}: Actual = {act:,.0f} Predicted = {pred:,.0f}")
+
+        plt.figure(figsize=(9, 4))
+        plt.plot(cdf['Year'], cdf['Total'], label='Actual', color='black')
+        plt.plot(test_years, fc_test, label='Forecast', linestyle='--', color='red')
+        plt.axvline(x=split_year, color='gray', linestyle=':')
+        plt.title(f'{country}: ARIMA Forecast vs Actual')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
 
     mae_c = mean_absolute_error(test_c, fc_test)
+    r2_c = r2_score(test_c, fc_test)
+    arima_country_r2[country] = r2_c
+
     print(f"  {country:<12} Order: {best_order} | Test MAE: {mae_c:>8.2f} MtCO2")
+
+country_perf = pd.DataFrame({
+    'MAE': {c: mean_absolute_error(df[df['Country']==c].sort_values('Year')[df['Year']>split_year]['Total'],
+                                     arima_country_preds_test[c]) for c in top_countries},
+    'R2': arima_country_r2
+}).sort_values('R2', ascending=False)
+print(country_perf)
 
 #aggregate
 arima_cl_test_total = pd.DataFrame(arima_country_preds_test, index=test_years).sum(axis=1)
 arima_cl_test_mae = mean_absolute_error(actual_test, arima_cl_test_total.values)
 arima_cl_test_r2 = r2_score(actual_test, arima_cl_test_total.values)
 
-arima_cl_future_total = pd.DataFrame(arima_country_preds_future, index=np.arange(start_year, forecast_end + 1)).sum(axis=1)
+arima_cl_future_total = pd.DataFrame(arima_country_preds_future).sum(axis=1, min_count=1)
 
 print(f"\n  Aggregated Test MAE: {arima_cl_test_mae:,.2f} MtCO2")
 print(f"  Aggregated Test R²:  {arima_cl_test_r2:.4f}")
