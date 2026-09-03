@@ -121,7 +121,7 @@ plt.show()
 
 #pie chart: share by country
 df.groupby('Country')['Total'].sum().sort_values(ascending=False).plot(kind='pie', autopct='%1.1f%%')
-plt.title('Share of Total Emissions by Country (2000-2021)')
+plt.title('Share of Total Emissions by Country (1950-2021)')
 plt.ylabel('')
 plt.tight_layout()
 plt.show()
@@ -549,7 +549,7 @@ plt.tight_layout()
 plt.show()
 
 #model comparison table
-print("FINAL MODEL COMPARISON (Test Set: 2018-2021)")
+print("FINAL MODEL COMPARISON (Test Set: 1991-2021)")
 
 results_df = pd.DataFrame(model_results).T
 results_df.columns = ['Train MAE', 'Train R²', 'Test MAE', 'Test R²']
